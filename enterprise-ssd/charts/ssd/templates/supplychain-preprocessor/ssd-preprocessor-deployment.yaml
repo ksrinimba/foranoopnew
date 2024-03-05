@@ -1,0 +1,105 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: supplychain-preprocessor
+  labels:
+    app: oes
+    component: oes-supplychain-preprocessor
+{{ include "oes.standard-labels" . | indent 4 }}
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: oes
+      component: oes-supplychain-preprocessor
+  strategy:
+    type: Recreate
+  template:
+    metadata:
+      labels:
+        app: oes
+        component: oes-supplychain-preprocessor
+{{ include "oes.standard-labels" . | indent 8 }}
+      annotations:
+{{- if .Values.supplychainpreprocessor.annotations -}}
+        {{ toYaml .Values.supplychainpreprocessor.annotations | nindent 8 }}
+{{- end }}
+    spec:
+      containers:
+      - name: oes-supplychain-preprocessor
+        image: {{ template "supplychainpreprocessor.image" . }}
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+        - mountPath: /etc/config
+          name: preprocessor-volume
+        - mountPath: /etc/secrets/
+          name: ssdsecret
+          readOnly: true
+        readinessProbe:
+          failureThreshold: 6
+          httpGet:
+            path: /healthz
+            port: 8058
+            scheme: HTTP
+          periodSeconds: 20
+          successThreshold: 1
+          timeoutSeconds: 1
+        securityContext:
+      {{- if .Values.supplychainpreprocessor.securityContext }}
+      {{ toYaml .Values.supplychainpreprocessor.securityContext | nindent 12 }}
+      {{- else }}
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop:
+              - ALL
+            readOnlyRootFilesystem: true
+            runAsNonRoot: true
+            runAsUser: 1000
+            runAsGroup: 1000
+            seccompProfile:
+              type: RuntimeDefault
+      {{- end }}
+
+
+      imagePullSecrets:
+        - name: opsmx11-secret
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      volumes:
+      - emptyDir: {}
+        name: tmp
+      - name: preprocessor-volume
+        secret:
+          secretName: supplychain-preprocessor
+      - name: ssdsecret
+        secret:
+          defaultMode: 420
+          items:
+          - key: AESEncryptionKey
+            path: ssdsecret/AESEncryptionKey
+          secretName: ssdsecret
+      securityContext:
+        runAsNonRoot: true
+      {{- if .Values.imagePullSecret }}
+      imagePullSecrets:
+      - name: {{ .Values.imagePullSecret }}
+      {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.topologySpreadConstraints }}
+      topologySpreadConstraints:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+
+
