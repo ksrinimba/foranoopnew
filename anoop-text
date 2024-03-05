@@ -1,0 +1,1 @@
+helm template ssd . -f feb292024-saml-values.yaml  -f feb29-rcimages-values.yaml -n opsmx-ssd poc-ssd > poc-ssd.yaml
